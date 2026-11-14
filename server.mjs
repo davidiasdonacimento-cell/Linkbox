@@ -194,7 +194,7 @@ const server = createServer(async (incoming, outgoing) => {
   try {
     const method = incoming.method || "GET";
     const host = incoming.headers.host || "localhost";
-    const requestUrl = new URL(incoming.url || "/", \`http://\${host}\`).toString();
+    const requestUrl = new URL(incoming.url || "/", "http://" + host).toString();
 
     if (method === "POST" && new URL(requestUrl).pathname === "/api/upload") {
       const forwarded = String(incoming.headers["x-forwarded-for"] || "").split(",")[0].trim();
@@ -248,7 +248,7 @@ const server = createServer(async (incoming, outgoing) => {
 setInterval(() => { removeExpiredFiles().catch((error) => console.error("Limpeza de arquivos expirados falhou:", error)); }, 5 * 60 * 1000).unref();
 
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(\`LinkBox ativo na porta \${PORT}\`);
+  console.log("LinkBox ativo na porta " + PORT);
   console.log("Armazenamento temporário ativo: 50 MB por arquivo, 250 MB totais, expiração em 24 horas.");
 });
 
