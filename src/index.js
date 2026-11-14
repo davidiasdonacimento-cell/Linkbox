@@ -258,6 +258,16 @@ function makeId() {
     .replace(/=+$/g, "");
 }
 
+function parseExpiry(value) {
+  const input = String(value || "24h").trim().toLowerCase();
+  const match = /^(\\d{1,4})(m|h)$/.exec(input);
+  if (!match) return null;
+  const amount = Number(match[1]);
+  const minutes = amount * (match[2] === "h" ? 60 : 1);
+  if (!Number.isSafeInteger(minutes) || minutes < 1 || minutes > 24 * 60) return null;
+  return minutes * 60 * 1000;
+}
+
 async function uploadFile(request, env) {
   if (!env.FILES) {
     return json({
@@ -287,7 +297,13 @@ async function uploadFile(request, env) {
     return json({ ok: false, error: "O limite por arquivo é de 50 MB." }, 413);
   }
 
-  const filename = cleanFilename(new URL(request.url).searchParams.get("filename"));
+  const uploadUrl = new URL(request.url);
+  const expiryMs = parseExpiry(uploadUrl.searchParams.get("expires"));
+  if (!expiryMs) {
+    return json({ ok: false, error: "Validade inválida. Use de 1m até 24h (exemplos: 10m, 2h ou 24h)." }, 400);
+  }
+  const expiresAt = Date.now() + expiryMs;
+  const filename = cleanFilename(uploadUrl.searchParams.get("filename"));
   const contentType = (request.headers.get("content-type") || "application/octet-stream").slice(0, 150);
   const id = makeId();
 
@@ -295,7 +311,7 @@ async function uploadFile(request, env) {
   try {
     stored = await env.FILES.put("files/" + id, request.body, {
       httpMetadata: { contentType },
-      customMetadata: { originalName: filename }
+      customMetadata: { originalName: filename, expiresAt: String(expiresAt) }
     });
   } catch (error) {
     if (error?.code === "STORAGE_FULL") {
@@ -313,7 +329,8 @@ async function uploadFile(request, env) {
     id,
     filename,
     size: Number(stored?.size || size),
-    expiresInHours: temporaryMode ? 24 : null,
+    expiresAt: new Date(expiresAt).toISOString(),
+    expiresInSeconds: Math.floor(expiryMs / 1000),
     shortUrl: base + "/d/" + id
   }, 201);
 }
@@ -331,6 +348,16 @@ async function downloadFile(id, env) {
     return new Response("Não foi possível consultar o arquivo.", { status: 502 });
   }
   if (!object) return new Response("Arquivo não encontrado ou link expirado.", { status: 404 });
+  const expiresAt = Number(object.customMetadata?.expiresAt || 0);
+  if (expiresAt && Date.now() >= expiresAt) {
+    if (typeof env.FILES.delete === "function") {
+      await env.FILES.delete("files/" + id).catch(() => {});
+    }
+    return new Response("Este link expirou e o download foi bloqueado.", {
+      status: 410,
+      headers: { "cache-control": "no-store", "content-type": "text/plain; charset=utf-8" }
+    });
+  }
 
   const filename = cleanFilename(object.customMetadata?.originalName || "arquivo");
   const headers = new Headers();
@@ -353,7 +380,8 @@ export default {
         storageConfigured: Boolean(env.FILES),
         uploadEnabled: Boolean(env.FILES && (env.UPLOAD_KEY || env.NODE_EPHEMERAL_STORAGE)),
         storageMode: env.NODE_EPHEMERAL_STORAGE ? "temporario" : "r2",
-        fileRetentionHours: env.NODE_EPHEMERAL_STORAGE ? 24 : null,
+        maxRetentionHours: 24,
+        minRetentionMinutes: 1,
         maxUploadMB: 50
       });
     }
