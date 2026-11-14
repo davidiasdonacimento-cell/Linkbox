@@ -260,10 +260,11 @@ function makeId() {
 
 function parseExpiry(value) {
   const input = String(value || "24h").trim().toLowerCase();
-  const match = /^(\\d{1,4})(m|h)$/.exec(input);
+  const match = /^(\d{1,4})(minutos|minuto|mins|min|m|horas|hora|hr|h)$/.exec(input.replace(/\s+/g, ""));
   if (!match) return null;
   const amount = Number(match[1]);
-  const minutes = amount * (match[2] === "h" ? 60 : 1);
+  const unit = match[2] === "h" || match[2] === "hr" || match[2].startsWith("hora") ? "h" : "m";
+  const minutes = amount * (unit === "h" ? 60 : 1);
   if (!Number.isSafeInteger(minutes) || minutes < 1 || minutes > 24 * 60) return null;
   return minutes * 60 * 1000;
 }
@@ -300,7 +301,7 @@ async function uploadFile(request, env) {
   const uploadUrl = new URL(request.url);
   const expiryMs = parseExpiry(uploadUrl.searchParams.get("expires"));
   if (!expiryMs) {
-    return json({ ok: false, error: "Validade inválida. Use de 1m até 24h (exemplos: 10m, 2h ou 24h)." }, 400);
+    return json({ ok: false, error: "Validade inválida. Use de 1 minuto até 24 horas (exemplos: 10m, 10 minutos, 2h ou 24h)." }, 400);
   }
   const expiresAt = Date.now() + expiryMs;
   const filename = cleanFilename(uploadUrl.searchParams.get("filename"));
