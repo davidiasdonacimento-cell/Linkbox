@@ -386,7 +386,12 @@ async function downloadFile(id, env, inline = false) {
   const filename = cleanFilename(object.customMetadata?.originalName || "arquivo");
   const headers = new Headers();
   object.writeHttpMetadata(headers);
-  headers.set("content-type", object.httpMetadata?.contentType || "application/octet-stream");
+  const contentType = String(object.httpMetadata?.contentType || "application/octet-stream").split(";")[0].toLowerCase();
+  if (inline && !new Set(["image/jpeg","image/png","image/gif","image/webp","image/avif","image/bmp","video/mp4","video/webm","video/ogg"]).has(contentType)) {
+    try { await object.body?.cancel?.(); } catch {}
+    return new Response("Prévia não disponível para este tipo de arquivo.", { status: 415, headers: { "cache-control": "no-store", "content-type": "text/plain; charset=utf-8" } });
+  }
+  headers.set("content-type", contentType);
   if (inline) { headers.set("content-disposition", "inline"); } else { headers.set("content-disposition", "attachment; } filename*=UTF-8''" + encodeURIComponent(filename));
   headers.set("cache-control", "private, no-store");
   headers.set("x-content-type-options", "nosniff");
