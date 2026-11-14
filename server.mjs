@@ -119,9 +119,10 @@ const localFiles = {
     const dataPath = path.join(STORAGE_DIR, id + ".bin");
     const metaPath = path.join(STORAGE_DIR, id + ".json");
     let meta;
+    let expiresAt;
     try {
       meta = JSON.parse(await readFile(metaPath, "utf8"));
-      const expiresAt = Number(meta.expiresAt) || (Number(meta.createdAt) + RETENTION_MS);
+      expiresAt = Number(meta.expiresAt) || (Number(meta.createdAt) + RETENTION_MS);
       if (!meta.createdAt || Date.now() >= expiresAt) {
         storedBytes = Math.max(0, storedBytes - Number(meta.size || 0));
         await unlink(dataPath).catch(() => {});
