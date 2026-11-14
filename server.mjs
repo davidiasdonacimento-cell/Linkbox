@@ -42,7 +42,8 @@ async function removeExpiredFiles() {
     try {
       const meta = JSON.parse(await readFile(metaPath, "utf8"));
       const info = await stat(dataPath);
-      if (!meta.createdAt || now - meta.createdAt > RETENTION_MS) {
+      const expiresAt = Number(meta.expiresAt) || (Number(meta.createdAt) + RETENTION_MS);
+      if (!meta.createdAt || now >= expiresAt) {
         await unlink(dataPath).catch(() => {});
         await unlink(metaPath).catch(() => {});
       } else {
@@ -96,6 +97,7 @@ const localFiles = {
       if (size < 1) throw new Error("Empty file");
       const meta = {
         createdAt: Date.now(),
+        expiresAt: Number(options.customMetadata?.expiresAt) || (Date.now() + RETENTION_MS),
         size,
         httpMetadata: options.httpMetadata || {},
         customMetadata: options.customMetadata || {}
@@ -119,7 +121,8 @@ const localFiles = {
     let meta;
     try {
       meta = JSON.parse(await readFile(metaPath, "utf8"));
-      if (!meta.createdAt || Date.now() - meta.createdAt > RETENTION_MS) {
+      const expiresAt = Number(meta.expiresAt) || (Number(meta.createdAt) + RETENTION_MS);
+      if (!meta.createdAt || Date.now() >= expiresAt) {
         storedBytes = Math.max(0, storedBytes - Number(meta.size || 0));
         await unlink(dataPath).catch(() => {});
         await unlink(metaPath).catch(() => {});
@@ -133,7 +136,7 @@ const localFiles = {
     return {
       body: Readable.toWeb(createReadStream(dataPath)),
       httpMetadata: meta.httpMetadata || {},
-      customMetadata: meta.customMetadata || {},
+      customMetadata: { ...(meta.customMetadata || {}), expiresAt: String(expiresAt) },
       writeHttpMetadata(headers) {
         if (this.httpMetadata.contentType) headers.set("content-type", this.httpMetadata.contentType);
       }
@@ -249,7 +252,7 @@ setInterval(() => { removeExpiredFiles().catch((error) => console.error("Limpeza
 
 server.listen(PORT, "0.0.0.0", () => {
   console.log("LinkBox ativo na porta " + PORT);
-  console.log("Armazenamento temporário ativo: 50 MB por arquivo, 250 MB totais, expiração em 24 horas.");
+  console.log("Armazenamento temporário ativo: 50 MB por arquivo, 250 MB totais, validade configurável de 1 minuto até 24 horas.");
 });
 
 process.on("SIGTERM", () => {
