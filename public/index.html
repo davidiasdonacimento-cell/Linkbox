@@ -52,12 +52,11 @@
         </div>
         <form id="uploadForm">
           <input class="field" id="fileInput" type="file" required>
-          <input class="field" id="keyInput" type="password" placeholder="Chave de envio" autocomplete="off" style="margin-top:10px">
           <button class="btn" id="uploadBtn" type="submit" disabled>Enviar e criar link</button>
         </form>
-        <p class="status" id="uploadStatus" aria-live="polite">O armazenamento precisa ser configurado pelo responsável.</p>
+        <p class="status" id="uploadStatus" aria-live="polite">Preparando o armazenamento temporário...</p>
         <div class="result" id="uploadResult"></div>
-        <p class="note">Limite desta versão: 95 MB por arquivo. O link gerado é público: qualquer pessoa com o endereço poderá baixar o arquivo.</p>
+        <p class="note">Até 50 MB por arquivo. Os links são públicos e temporários: expiram em 24 horas ou quando o serviço reiniciar. Limite de 5 envios por hora por endereço.</p>
       </article>
 
       <section class="card wide">
@@ -114,15 +113,15 @@
         const data = await response.json();
         if (data.storageConfigured && data.uploadEnabled) {
           $("storageDot").classList.add("on");
-          $("storageText").textContent = "R2 conectado • envios liberados";
+          $("storageText").textContent = data.storageMode === "temporario" ? "Armazenamento temporário ativo • 24h" : "R2 conectado • envios liberados";
           $("uploadBtn").disabled = false;
-          setStatus("uploadStatus", "Armazenamento pronto. Selecione um arquivo e informe a chave.", "");
+          setStatus("uploadStatus", data.storageMode === "temporario" ? "Pronto para enviar. Os links ficam disponíveis por até 24 horas." : "Armazenamento pronto. Selecione um arquivo e informe a chave.", "");
         } else if (data.storageConfigured) {
           $("storageText").textContent = "R2 conectado • falta configurar a chave";
           setStatus("uploadStatus", "O R2 está conectado, mas a chave de envio ainda não foi configurada.", "");
         } else {
-          $("storageText").textContent = "Aguardando configuração do R2";
-          setStatus("uploadStatus", "O envio será liberado depois de conectar o bucket R2 e configurar UPLOAD_KEY.", "");
+          $("storageText").textContent = "Armazenamento indisponível";
+          setStatus("uploadStatus", "O armazenamento não está configurado neste servidor.", "bad");
         }
       } catch {
         $("storageText").textContent = "Não foi possível verificar";
@@ -154,8 +153,8 @@
 
     $("fileInput").addEventListener("change", () => {
       const file = $("fileInput").files[0];
-      if (file && file.size > 95 * 1024 * 1024) {
-        setStatus("uploadStatus", "Esse arquivo passa do limite de 95 MB.", "bad");
+      if (file && file.size > 50 * 1024 * 1024) {
+        setStatus("uploadStatus", "Esse arquivo passa do limite de 50 MB.", "bad");
         $("uploadBtn").disabled = true;
       } else {
         checkHealth();
@@ -166,8 +165,8 @@
       event.preventDefault();
       const file = $("fileInput").files[0];
       if (!file) return;
-      if (file.size > 95 * 1024 * 1024) {
-        setStatus("uploadStatus", "Esse arquivo passa do limite de 95 MB.", "bad");
+      if (file.size > 50 * 1024 * 1024) {
+        setStatus("uploadStatus", "Esse arquivo passa do limite de 50 MB.", "bad");
         return;
       }
       $("uploadBtn").disabled = true;
@@ -178,16 +177,15 @@
           method: "POST",
           headers: {
             "content-type": file.type || "application/octet-stream",
-            "x-upload-key": $("keyInput").value
+            "x-file-size": String(file.size)
           },
           body: file
         });
         const data = await response.json();
         if (!response.ok || !data.ok) throw new Error(data.error || "Não foi possível enviar o arquivo.");
-        setStatus("uploadStatus", "🟢 Arquivo enviado com sucesso!", "good");
+        setStatus("uploadStatus", "🟢 Arquivo enviado! Link temporário criado por até 24 horas.", "good");
         addLink($("uploadResult"), data.shortUrl, data.filename + " • " + formatSize(data.size));
         $("fileInput").value = "";
-        $("keyInput").value = "";
       } catch (error) {
         setStatus("uploadStatus", error.message || "Erro no envio.", "bad");
       } finally {
