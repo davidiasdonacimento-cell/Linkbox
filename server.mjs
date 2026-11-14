@@ -136,6 +136,7 @@ const localFiles = {
 
     return {
       body: Readable.toWeb(createReadStream(dataPath)),
+      size: Number(meta.size || 0),
       httpMetadata: meta.httpMetadata || {},
       customMetadata: { ...(meta.customMetadata || {}), expiresAt: String(expiresAt) },
       writeHttpMetadata(headers) {
