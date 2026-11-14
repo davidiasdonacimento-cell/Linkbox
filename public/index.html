@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080d20">
+  <meta name="description" content="LinkBox: extrator de links e compartilhamento de arquivos.">
+  <title>LinkBox — seus links em um só lugar</title>
+  <style>
+    :root{color-scheme:dark;--bg:#080d20;--panel:#111a35;--panel2:#0d1530;--line:#28365d;--text:#f5f7ff;--muted:#a8b4d4;--blue:#4d8dff;--cyan:#54d7f5;--purple:#9867ff;--pink:#db69dc;--green:#5ce0ae}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 15% 0%,#20275c 0,transparent 42%),radial-gradient(ellipse at 95% 18%,#3c1d65 0,transparent 35%),var(--bg);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--text)}
+    .wrap{width:min(980px,calc(100% - 28px));margin:0 auto;padding:38px 0 42px}.top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:30px}.brand{display:flex;align-items:center;gap:12px}.logo{width:46px;height:46px;border-radius:15px;display:grid;place-items:center;background:linear-gradient(135deg,var(--blue),var(--purple) 62%,var(--pink));box-shadow:0 8px 28px #7259ff55;font-size:23px}.brand h1{font-size:23px;letter-spacing:.3px;margin:0}.brand p{margin:3px 0 0;color:var(--muted);font-size:12px}.pill{border:1px solid #34436c;background:#111a35aa;color:#cbd6f5;border-radius:99px;padding:8px 12px;font-size:12px}
+    .hero{text-align:center;margin:20px auto 28px;max-width:700px}.hero h2{font-size:clamp(28px,5vw,43px);line-height:1.08;margin:0 0 12px;letter-spacing:-1px}.gradient{background:linear-gradient(90deg,#65cfff,#a78aff,#f08ce9);-webkit-background-clip:text;background-clip:text;color:transparent}.hero p{color:var(--muted);margin:0;font-size:15px;line-height:1.6}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:17px}.card{background:linear-gradient(155deg,#151f40f2,#0e1731f5);border:1px solid var(--line);border-radius:22px;padding:22px;box-shadow:0 18px 55px #0003;min-width:0}.cardhead{display:flex;align-items:center;gap:11px;margin-bottom:18px}.symbol{width:40px;height:40px;border-radius:13px;background:#273b6d;display:grid;place-items:center;font-size:20px}.card h3{font-size:18px;margin:0}.sub{font-size:12px;color:var(--muted);margin:4px 0 0}.field{width:100%;border:1px solid #34446f;background:#080f25;color:var(--text);padding:14px 15px;border-radius:13px;outline:none;font:inherit;font-size:14px}.field:focus{border-color:#7c86ff;box-shadow:0 0 0 3px #796cff22}input[type=file]{padding:10px}.btn{border:0;border-radius:13px;padding:13px 17px;background:linear-gradient(100deg,#397df4,#8061f5 65%,#b55ce0);color:white;font-weight:750;font-size:14px;cursor:pointer;width:100%;margin-top:12px;box-shadow:0 8px 22px #655ee044}.btn:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}.status{font-size:13px;color:var(--muted);line-height:1.5;margin:13px 0 0;min-height:20px}.status.good{color:var(--green)}.status.bad{color:#ff9baf}.result{display:grid;gap:9px;margin-top:14px}.result a{color:#8edbff;overflow-wrap:anywhere;font-size:13px}.item{padding:12px;border:1px solid #2d3c66;border-radius:12px;background:#0a122a}.item small{color:var(--muted);display:block;margin-bottom:6px}.copy{border:1px solid #43598c;background:#172448;color:#dce8ff;border-radius:9px;padding:8px 10px;font-size:12px;margin-top:9px;cursor:pointer}.note{color:var(--muted);font-size:11px;line-height:1.5;margin-top:12px}.wide{grid-column:1/-1;display:flex;justify-content:space-between;gap:14px;align-items:center}.storage{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--muted)}.dot{width:8px;height:8px;border-radius:50%;background:#d2a64e;box-shadow:0 0 10px #d2a64e88}.dot.on{background:var(--green);box-shadow:0 0 10px #5ce0ae88}footer{text-align:center;color:#7583a8;font-size:11px;margin-top:25px}.hidden{display:none!important}
+    @media(max-width:700px){.wrap{padding-top:24px}.top{margin-bottom:22px}.grid{grid-template-columns:1fr}.wide{grid-column:auto;align-items:flex-start;flex-direction:column}.card{padding:19px}.hero{margin-top:14px}}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="top">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">↗</div>
+        <div><h1>LinkBox</h1><p>LINKS • ARQUIVOS • SIMPLICIDADE</p></div>
+      </div>
+      <div class="pill">VIDEO & FILE HUB</div>
+    </header>
+
+    <section class="hero">
+      <h2>Seus links, <span class="gradient">em um só lugar.</span></h2>
+      <p>Encontre endereços diretos em páginas públicas e compartilhe seus arquivos por links curtos.</p>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <div class="cardhead">
+          <div class="symbol">🔎</div>
+          <div><h3>Extrator de links</h3><p class="sub">Análise de páginas públicas</p></div>
+        </div>
+        <form id="extractForm">
+          <input class="field" id="urlInput" type="url" placeholder="https://exemplo.com/pagina" required autocomplete="url">
+          <button class="btn" id="extractBtn" type="submit">Extrair links</button>
+        </form>
+        <p class="status" id="extractStatus" aria-live="polite">Cole um endereço público para começar.</p>
+        <div class="result" id="extractResults"></div>
+        <p class="note">Não acessa contas, não contorna bloqueios e não remove proteções. Alguns sites não expõem links diretos.</p>
+      </article>
+
+      <article class="card">
+        <div class="cardhead">
+          <div class="symbol">📤</div>
+          <div><h3>Enviar arquivo</h3><p class="sub">Crie um link curto para download</p></div>
+        </div>
+        <form id="uploadForm">
+          <input class="field" id="fileInput" type="file" required>
+          <input class="field" id="keyInput" type="password" placeholder="Chave de envio" autocomplete="off" style="margin-top:10px">
+          <button class="btn" id="uploadBtn" type="submit" disabled>Enviar e criar link</button>
+        </form>
+        <p class="status" id="uploadStatus" aria-live="polite">O armazenamento precisa ser configurado pelo responsável.</p>
+        <div class="result" id="uploadResult"></div>
+        <p class="note">Limite desta versão: 95 MB por arquivo. O link gerado é público: qualquer pessoa com o endereço poderá baixar o arquivo.</p>
+      </article>
+
+      <section class="card wide">
+        <div>
+          <h3>Estado do sistema</h3>
+          <p class="sub">Conexão do armazenamento</p>
+        </div>
+        <div class="storage"><span class="dot" id="storageDot"></span><span id="storageText">Verificando...</span></div>
+      </section>
+    </section>
+
+    <footer>LinkBox • Desenvolvido para compartilhar com simplicidade</footer>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const formatSize = (n) => {
+      if (!n) return "Tamanho não informado";
+      const units = ["B", "KB", "MB", "GB"];
+      let value = n, index = 0;
+      while (value >= 1024 && index < units.length - 1) { value /= 1024; index++; }
+      return value.toFixed(index ? 1 : 0) + " " + units[index];
+    };
+    function setStatus(id, message, type) {
+      const el = $(id);
+      el.textContent = message;
+      el.className = "status" + (type ? " " + type : "");
+    }
+    function addLink(container, url, label) {
+      const box = document.createElement("div");
+      box.className = "item";
+      const small = document.createElement("small");
+      small.textContent = label || "Link encontrado";
+      const a = document.createElement("a");
+      a.href = url;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.textContent = url;
+      const copy = document.createElement("button");
+      copy.className = "copy";
+      copy.type = "button";
+      copy.textContent = "Copiar link";
+      copy.addEventListener("click", async () => {
+        try { await navigator.clipboard.writeText(url); copy.textContent = "Copiado!"; }
+        catch { copy.textContent = "Não foi possível copiar"; }
+      });
+      box.append(small, a, copy);
+      container.append(box);
+    }
+
+    async function checkHealth() {
+      try {
+        const response = await fetch("/api/health", { cache: "no-store" });
+        const data = await response.json();
+        if (data.storageConfigured && data.uploadEnabled) {
+          $("storageDot").classList.add("on");
+          $("storageText").textContent = "R2 conectado • envios liberados";
+          $("uploadBtn").disabled = false;
+          setStatus("uploadStatus", "Armazenamento pronto. Selecione um arquivo e informe a chave.", "");
+        } else if (data.storageConfigured) {
+          $("storageText").textContent = "R2 conectado • falta configurar a chave";
+          setStatus("uploadStatus", "O R2 está conectado, mas a chave de envio ainda não foi configurada.", "");
+        } else {
+          $("storageText").textContent = "Aguardando configuração do R2";
+          setStatus("uploadStatus", "O envio será liberado depois de conectar o bucket R2 e configurar UPLOAD_KEY.", "");
+        }
+      } catch {
+        $("storageText").textContent = "Não foi possível verificar";
+        setStatus("uploadStatus", "O estado do armazenamento não pôde ser consultado.", "bad");
+      }
+    }
+
+    $("extractForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      $("extractResults").replaceChildren();
+      $("extractBtn").disabled = true;
+      setStatus("extractStatus", "Analisando a página...", "");
+      try {
+        const response = await fetch("/api/extract", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ url: $("urlInput").value.trim() })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || "Falha ao analisar o endereço.");
+        setStatus("extractStatus", data.message, data.candidates.length ? "good" : "");
+        data.candidates.forEach((url, index) => addLink($("extractResults"), url, "Possível arquivo direto " + (index + 1)));
+      } catch (error) {
+        setStatus("extractStatus", error.message || "Erro ao extrair links.", "bad");
+      } finally {
+        $("extractBtn").disabled = false;
+      }
+    });
+
+    $("fileInput").addEventListener("change", () => {
+      const file = $("fileInput").files[0];
+      if (file && file.size > 95 * 1024 * 1024) {
+        setStatus("uploadStatus", "Esse arquivo passa do limite de 95 MB.", "bad");
+        $("uploadBtn").disabled = true;
+      } else {
+        checkHealth();
+      }
+    });
+
+    $("uploadForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const file = $("fileInput").files[0];
+      if (!file) return;
+      if (file.size > 95 * 1024 * 1024) {
+        setStatus("uploadStatus", "Esse arquivo passa do limite de 95 MB.", "bad");
+        return;
+      }
+      $("uploadBtn").disabled = true;
+      $("uploadResult").replaceChildren();
+      setStatus("uploadStatus", "Enviando " + file.name + " (" + formatSize(file.size) + ")...", "");
+      try {
+        const response = await fetch("/api/upload?filename=" + encodeURIComponent(file.name), {
+          method: "POST",
+          headers: {
+            "content-type": file.type || "application/octet-stream",
+            "x-upload-key": $("keyInput").value
+          },
+          body: file
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || "Não foi possível enviar o arquivo.");
+        setStatus("uploadStatus", "🟢 Arquivo enviado com sucesso!", "good");
+        addLink($("uploadResult"), data.shortUrl, data.filename + " • " + formatSize(data.size));
+        $("fileInput").value = "";
+        $("keyInput").value = "";
+      } catch (error) {
+        setStatus("uploadStatus", error.message || "Erro no envio.", "bad");
+      } finally {
+        checkHealth();
+      }
+    });
+
+    checkHealth();
+  </script>
+</body>
+</html>
