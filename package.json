@@ -1,0 +1,13 @@
+{
+  "name": "linkbox",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LinkBox — extrator de links e compartilhamento de arquivos com Cloudflare Workers e R2",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
