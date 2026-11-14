@@ -53,8 +53,8 @@
         <form id="uploadForm">
           <input class="field" id="fileInput" type="file" required>
           <label class="field-label" for="expiryInput">Validade do link (máximo 24 horas)</label>
-          <input class="field" id="expiryInput" type="text" value="24h" required inputmode="text" maxlength="5" placeholder="Ex.: 1m, 10m, 2h ou 24h" aria-describedby="expiryHelp">
-          <p class="note" id="expiryHelp">Digite minutos ou horas: 1m até 1440m, ou 1h até 24h. Exemplos: 1m, 10m, 90m, 2h, 24h.</p>
+          <input class="field" id="expiryInput" type="text" value="24h" required inputmode="text" maxlength="16" placeholder="Ex.: 1m, 10 minutos, 2h ou 24h" aria-describedby="expiryHelp">
+          <p class="note" id="expiryHelp">Digite minutos ou horas: 1m até 1440m, ou 1h até 24h. Também aceita texto: “10 minutos” ou “2 horas”.</p>
           <button class="btn" id="uploadBtn" type="submit" disabled>Enviar e criar link</button>
         </form>
         <div class="analysis" id="fileAnalysis" hidden aria-live="polite"></div>
@@ -111,10 +111,13 @@
       return seconds + " segundo(s)";
     }
     function parseDuration(value) {
-      const match = /^(\\d{1,4})(m|h)$/i.exec(String(value || "").trim());
+      const clean = String(value || "").trim().toLowerCase().replace(/\s+/g, "");
+      const match = /^(\d{1,4})(minutos|minuto|mins|min|m|horas|hora|hr|h)$/i.exec(clean);
       if (!match) return null;
       const amount = Number(match[1]);
-      const minutes = amount * (match[2].toLowerCase() === "h" ? 60 : 1);
+      const unit = match[2].toLowerCase();
+      const isHours = unit === "h" || unit === "hr" || unit.startsWith("hora");
+      const minutes = amount * (isHours ? 60 : 1);
       return Number.isSafeInteger(minutes) && minutes >= 1 && minutes <= 1440 ? minutes * 60 : null;
     }
     function addLink(container, url, label, expiresAt = null) {
@@ -245,7 +248,9 @@
           $("storageDot").classList.add("on");
           $("storageText").textContent = data.storageMode === "temporario" ? "Armazenamento temporário ativo • validade até 24h" : "R2 conectado • envios liberados";
           $("uploadBtn").disabled = false;
-          setStatus("uploadStatus", data.storageMode === "temporario" ? "Pronto para enviar. Os links ficam disponíveis por até 24 horas." : "Armazenamento pronto. Selecione um arquivo e informe a chave.", "");
+          if (!$("uploadResult").children.length) {
+            setStatus("uploadStatus", data.storageMode === "temporario" ? "Pronto para enviar. Escolha validade de 1 minuto até 24 horas." : "Armazenamento pronto para receber arquivos.", "");
+          }
         } else if (data.storageConfigured) {
           $("storageText").textContent = "R2 conectado • falta configurar a chave";
           setStatus("uploadStatus", "O R2 está conectado, mas a chave de envio ainda não foi configurada.", "");
@@ -298,7 +303,7 @@
     $("expiryInput").addEventListener("input", () => {
       const seconds = parseDuration($("expiryInput").value);
       if (!seconds) {
-        setStatus("uploadStatus", "Validade inválida. Digite de 1m até 24h, por exemplo 10m ou 2h.", "bad");
+        setStatus("uploadStatus", "Validade inválida. Digite de 1 minuto até 24 horas, por exemplo “10 minutos” ou “2h”.", "bad");
       } else {
         setStatus("uploadStatus", "Validade selecionada: " + formatDuration(seconds) + ".", "");
       }
@@ -314,7 +319,7 @@
       }
       const expirySeconds = parseDuration($("expiryInput").value);
       if (!expirySeconds) {
-        setStatus("uploadStatus", "Validade inválida. Use 1m até 24h (ex.: 10m, 90m ou 2h).", "bad");
+        setStatus("uploadStatus", "Validade inválida. Use de 1 minuto até 24 horas (ex.: 10m, 90m, “10 minutos” ou 2h).", "bad");
         $("expiryInput").focus();
         return;
       }
