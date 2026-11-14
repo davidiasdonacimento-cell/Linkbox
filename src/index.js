@@ -1,4 +1,4 @@
-const MAX_UPLOAD_BYTES = 95 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
   "cache-control": "no-store"
@@ -76,8 +76,34 @@ async function readTextLimited(response, limit) {
 function findMediaCandidates(html, baseUrl) {
   const found = [];
   const seen = new Set();
-  const tags = html.matchAll(/<(video|audio|source|meta|a)\b[^>]*>/gi);
+  const extensions = /\.(mp4|m4v|mov|webm|mkv|avi|flv|3gp|mp3|m4a|wav|ogg|m3u8|mpd|m4s|ts|pdf|zip|rar)(?:$|[?#])/i;
+  const add = (value, requireMediaExtension = false) => {
+    if (!value) return;
+    const candidate = String(value)
+      .replace(/&amp;/gi, "&")
+      .replace(/\\u0026/gi, "&")
+      .replace(/\\u003d/gi, "=")
+      .replace(/\\\//g, "/")
+      .trim()
+      .replace(/^["']|["']$/g, "");
+    if (!candidate || /^(data:|blob:|javascript:)/i.test(candidate)) return;
+    try {
+      const absolute = new URL(candidate, baseUrl);
+      if (
+        (absolute.protocol === "http:" || absolute.protocol === "https:") &&
+        !isBlockedHost(absolute.hostname) &&
+        (!requireMediaExtension || extensions.test(absolute.href)) &&
+        !seen.has(absolute.href)
+      ) {
+        seen.add(absolute.href);
+        found.push(absolute.href);
+      }
+    } catch {
+      // Ignore malformed page references.
+    }
+  };
 
+  const tags = html.matchAll(/<(video|audio|source|meta|a)\b[^>]*>/gi);
   for (const match of tags) {
     const tagName = match[1].toLowerCase();
     const tag = match[0];
@@ -86,41 +112,33 @@ function findMediaCandidates(html, baseUrl) {
       attrs[item[1].toLowerCase()] = item[2] ?? item[3] ?? item[4] ?? "";
     }
 
-    const candidates = [];
     if (["video", "audio", "source"].includes(tagName)) {
-      candidates.push(attrs.src, attrs["data-src"]);
+      add(attrs.src);
+      add(attrs["data-src"]);
+      add(attrs["data-url"]);
+      add(attrs["data-original"]);
     } else if (tagName === "meta") {
       const key = (attrs.property || attrs.name || "").toLowerCase();
-      if (/^(og:video|og:audio|twitter:player:stream)/.test(key)) {
-        candidates.push(attrs.content);
-      }
+      if (/^(og:video|og:audio|twitter:player:stream)/.test(key)) add(attrs.content);
     } else if (tagName === "a") {
-      const href = attrs.href || "";
-      if (/\.(mp4|m4v|mov|webm|mp3|m4a|wav|ogg|pdf|zip)(?:$|[?#])/i.test(href)) {
-        candidates.push(href);
-      }
-    }
-
-    for (const candidate of candidates) {
-      if (!candidate || candidate.startsWith("data:") || candidate.startsWith("javascript:")) continue;
-      try {
-        const absolute = new URL(candidate, baseUrl);
-        if (
-          (absolute.protocol === "http:" || absolute.protocol === "https:") &&
-          !isBlockedHost(absolute.hostname) &&
-          !seen.has(absolute.href)
-        ) {
-          seen.add(absolute.href);
-          found.push(absolute.href);
-        }
-      } catch {
-        // Ignore malformed page references.
-      }
+      add(attrs.href, true);
     }
   }
-  return found.slice(0, 10);
-}
 
+  // Some public pages expose media URLs inside JSON or script tags instead of media elements.
+  const normalized = html
+    .replace(/\\u0026/gi, "&")
+    .replace(/\\u003d/gi, "=")
+    .replace(/\\\//g, "/")
+    .replace(/&amp;/gi, "&");
+  const rawUrlPattern = /(?:https?:)?\/\/[^"'<>\\\s]+?\.(?:mp4|m4v|mov|webm|mkv|avi|flv|3gp|mp3|m4a|wav|ogg|m3u8|mpd|m4s|ts)(?:[?#][^"'<>\\\s]*)?/gi;
+  for (const match of normalized.matchAll(rawUrlPattern)) add(match[0], true);
+
+  const propertyPattern = /(?:["']?(?:file|src|videoUrl|contentUrl|downloadUrl)["']?)\s*[:=]\s*["']([^"']+)["']/gi;
+  for (const match of normalized.matchAll(propertyPattern)) add(match[1], true);
+
+  return found.slice(0, 20);
+}
 async function extractLinks(request) {
   let body;
   try {
@@ -144,15 +162,19 @@ async function extractLinks(request) {
         redirect: "manual",
         headers: {
           "user-agent": "LinkBox/1.0 (+link extractor)",
-          "accept": "text/html,application/xhtml+xml,video/*,audio/*,application/octet-stream,*/*;q=0.8"
-        }
+          "accept": "text/html,application/xhtml+xml,video/*,audio/*,application/vnd.apple.mpegurl,application/dash+xml,application/octet-stream,*/*;q=0.8",
+          "accept-language": "pt-BR,pt;q=0.9,en;q=0.8"
+        },
+        signal: AbortSignal.timeout(15000)
       });
 
       if (response.status >= 300 && response.status < 400) {
         const location = response.headers.get("location");
         if (!location || hop === 5) {
+          await response.body?.cancel().catch(() => {});
           return json({ ok: false, error: "O site redirecionou muitas vezes ou bloqueou a consulta." }, 502);
         }
+        await response.body?.cancel().catch(() => {});
         try {
           current = safeHttpUrl(new URL(location, current).href);
         } catch (error) {
@@ -167,11 +189,20 @@ async function extractLinks(request) {
   }
 
   if (!response || !response.ok) {
-    return json({ ok: false, error: "O site respondeu com erro HTTP " + (response?.status || "desconhecido") + "." }, 502);
+    const status = response?.status || 502;
+    if (status === 429) {
+      const retryAfter = response.headers.get("retry-after");
+      const waitText = retryAfter ? " Tente novamente após " + retryAfter + " (valor informado pelo site)." : " Aguarde um pouco antes de tentar novamente.";
+      return json({ ok: false, code: "source_rate_limited", retryAfter, error: "O site de origem limitou as consultas (HTTP 429)." + waitText }, 429);
+    }
+    if (status === 401 || status === 403) {
+      return json({ ok: false, error: "O site de origem exige acesso autorizado ou bloqueou a consulta (HTTP " + status + "). O LinkBox não contorna login ou proteção." }, 502);
+    }
+    return json({ ok: false, error: "O site respondeu com erro HTTP " + status + "." }, status === 404 ? 404 : 502);
   }
 
   const contentType = (response.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
-  const isMedia = /^(video\/|audio\/|image\/|application\/(octet-stream|pdf|zip|x-rar|vnd\.|msword))/.test(contentType);
+  const isMedia = /^(video\/|audio\/|image\/|application\/(octet-stream|pdf|zip|x-rar|vnd\.|msword|x-mpegurl|dash\+xml))/.test(contentType);
   if (isMedia) {
     return json({
       ok: true,
@@ -235,34 +266,45 @@ async function uploadFile(request, env) {
       error: "O armazenamento R2 ainda não foi conectado ao Worker."
     }, 503);
   }
-  if (!env.UPLOAD_KEY) {
+  const temporaryMode = Boolean(env.NODE_EPHEMERAL_STORAGE);
+  if (!temporaryMode && !env.UPLOAD_KEY) {
     return json({
       ok: false,
       code: "upload_key_missing",
       error: "O responsável pelo projeto precisa configurar o segredo UPLOAD_KEY antes de liberar envios."
     }, 503);
   }
-  if (request.headers.get("x-upload-key") !== env.UPLOAD_KEY) {
+  if (!temporaryMode && request.headers.get("x-upload-key") !== env.UPLOAD_KEY) {
     return json({ ok: false, error: "Chave de envio incorreta." }, 403);
   }
 
-  const size = Number(request.headers.get("content-length") || 0);
+  const size = Number(request.headers.get("x-file-size") || request.headers.get("content-length") || 0);
   if (!request.body) return json({ ok: false, error: "Nenhum arquivo foi enviado." }, 400);
+  if (!Number.isSafeInteger(size) || size < 1) {
+    return json({ ok: false, error: "Não foi possível confirmar o tamanho do arquivo." }, 411);
+  }
   if (size > MAX_UPLOAD_BYTES) {
-    return json({ ok: false, error: "O limite por arquivo é de 95 MB." }, 413);
+    return json({ ok: false, error: "O limite por arquivo é de 50 MB." }, 413);
   }
 
   const filename = cleanFilename(new URL(request.url).searchParams.get("filename"));
   const contentType = (request.headers.get("content-type") || "application/octet-stream").slice(0, 150);
   const id = makeId();
 
+  let stored;
   try {
-    await env.FILES.put("files/" + id, request.body, {
+    stored = await env.FILES.put("files/" + id, request.body, {
       httpMetadata: { contentType },
       customMetadata: { originalName: filename }
     });
-  } catch {
-    return json({ ok: false, error: "O R2 não conseguiu salvar o arquivo. Confira o bucket e os limites da conta." }, 502);
+  } catch (error) {
+    if (error?.code === "STORAGE_FULL") {
+      return json({ ok: false, error: "O espaço temporário do LinkBox está cheio. Tente novamente depois que arquivos antigos expirarem." }, 507);
+    }
+    if (error?.code === "FILE_TOO_LARGE") {
+      return json({ ok: false, error: "O limite por arquivo é de 50 MB." }, 413);
+    }
+    return json({ ok: false, error: "Não foi possível salvar o arquivo no armazenamento. Tente novamente." }, 502);
   }
 
   const base = new URL(request.url).origin;
@@ -270,7 +312,8 @@ async function uploadFile(request, env) {
     ok: true,
     id,
     filename,
-    size,
+    size: Number(stored?.size || size),
+    expiresInHours: temporaryMode ? 24 : null,
     shortUrl: base + "/d/" + id
   }, 201);
 }
@@ -308,8 +351,10 @@ export default {
       return json({
         ok: true,
         storageConfigured: Boolean(env.FILES),
-        uploadEnabled: Boolean(env.FILES && env.UPLOAD_KEY),
-        maxUploadMB: 95
+        uploadEnabled: Boolean(env.FILES && (env.UPLOAD_KEY || env.NODE_EPHEMERAL_STORAGE)),
+        storageMode: env.NODE_EPHEMERAL_STORAGE ? "temporario" : "r2",
+        fileRetentionHours: env.NODE_EPHEMERAL_STORAGE ? 24 : null,
+        maxUploadMB: 50
       });
     }
 
